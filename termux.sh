@@ -10,6 +10,7 @@ if [ -d "/data/data/com.termux/files/usr" ]; then
     release="Termux"
     TERMUX_HOME="/data/data/com.termux/files/home"
     TERMUX_PREFIX="/data/data/com.termux/files/usr"
+    CONFIG_DIR="$TERMUX_HOME/s-box-ag"
 else
     [[ $EUID -ne 0 ]] && yellow "请以root模式运行脚本" && exit
     if [[ -f /etc/redhat-release ]]; then
@@ -31,6 +32,7 @@ else
     else 
         red "脚本不支持当前的系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
     fi
+    CONFIG_DIR="/etc/s-box-ag"
 fi
 
 # 设置Termux环境变量
@@ -40,87 +42,38 @@ if [ "$release" = "Termux" ]; then
     export PREFIX="$TERMUX_PREFIX"
 fi
 
-op=$(cat /etc/redhat-release 2>/dev/null || cat /etc/os-release 2>/dev/null | grep -i pretty_name | cut -d \" -f2)
-if [[ $(echo "$op" | grep -i -E "arch") ]]; then
-red "脚本不支持当前的 $op 系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
-fi
-[[ -z $(systemd-detect-virt 2>/dev/null) ]] && vi=$(virt-what 2>/dev/null) || vi=$(systemd-detect-virt 2>/dev/null)
+# 创建配置目录
+mkdir -p "$CONFIG_DIR"
+
+# 检测CPU架构
 case $(uname -m) in
-aarch64) cpu=arm64;;
-x86_64) cpu=amd64;;
-*) red "目前脚本不支持$(uname -m)架构" && exit;;
+    aarch64) cpu=arm64;;
+    arm64) cpu=arm64;;
+    x86_64) cpu=amd64;;
+    *) echo "目前脚本不支持$(uname -m)架构" && exit;;
 esac
-hostname=$(hostname)
-export UUID=${uuid:-''}
-export port_vm_ws=${vmpt:-''}
-export ARGO_DOMAIN=${agn:-''}   
-export ARGO_AUTH=${agk:-''} 
 
-del(){
-if [[ -n $(ps -e | grep cloudflared) ]]; then
-kill -15 $(cat /etc/s-box-ag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
-fi
-if [[ x"${release}" == x"alpine" ]]; then
-rc-service sing-box stop
-rc-update del sing-box default
-rm /etc/init.d/sing-box -f
-else
-systemctl stop sing-box >/dev/null 2>&1
-systemctl disable sing-box >/dev/null 2>&1
-rm -f /etc/systemd/system/sing-box.service
-fi
-crontab -l > /tmp/crontab.tmp
-sed -i '/sbargopid/d' /tmp/crontab.tmp
-crontab /tmp/crontab.tmp
-rm /tmp/crontab.tmp
-rm -rf /etc/s-box-ag
-echo "卸载完成" 
-exit
-}
-
-agn(){
-argoname=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
-if [ -z $argoname ]; then
-argodomain=$(cat /etc/s-box-ag/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
-if [ -z $argodomain ]; then
-echo "当前argo临时域名未生成，建议卸载重装" 
-else
-echo "当前argo最新临时域名：$argodomain"
-fi
-else
-echo "当前argo固定域名：$argoname"
-echo "当前argo固定域名token：$(cat /etc/s-box-ag/sbargotoken.log 2>/dev/null)"
-fi
-exit
-}
-
-if [[ "$1" == "del" ]]; then
-del
-elif [[ "$1" == "agn" ]]; then
-agn
+# 生成随机端口和UUID
+if [ -z "$port_vm_ws" ]; then
+    if [ "$release" = "Termux" ]; then
+        port_vm_ws=$(( RANDOM % 55535 + 10000 ))
+    else
+        port_vm_ws=$(shuf -i 10000-65535 -n 1)
+    fi
 fi
 
-if [[ x"${release}" == x"alpine" ]]; then
-status_cmd="rc-service sing-box status"
-status_pattern="started"
-else
-status_cmd="systemctl status sing-box"
-status_pattern="active"
-fi
-if [[ -n $($status_cmd 2>/dev/null | grep -w "$status_pattern") && -f '/etc/s-box-ag/sb.json' ]]; then
-echo "ArgoSB脚本已在运行中" && exit
-elif [[ -z $($status_cmd 2>/dev/null | grep -w "$status_pattern") && -f '/etc/s-box-ag/sb.json' ]]; then
-echo "ArgoSB脚本已安装，但未启动，请卸载重装" && exit
-else
-echo "VPS系统：$op"
-echo "CPU架构：$cpu"
-echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
-echo
+if [ -z "$UUID" ]; then
+    if [ "$release" = "Termux" ]; then
+        UUID=$(uuidgen)
+    else
+        UUID=$("$CONFIG_DIR/sing-box" generate uuid)
+    fi
 fi
 
+# 安装依赖
 if [ "$release" = "Termux" ]; then
     pkg update -y
-    pkg install -y wget curl tar jq openssl git socat iproute2 grep
+    pkg install -y wget curl tar jq openssl git socat iproute2 grep uuid-runtime
 else
     if [[ x"${release}" == x"alpine" ]]; then
         apk update
@@ -129,6 +82,139 @@ else
     else
         apt update -y
         apt install curl wget tar gzip cron -y
+    fi
+fi
+
+# 下载sing-box
+sbcore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/SagerNet/sing-box | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
+sbname="sing-box-$sbcore-linux-$cpu"
+echo "下载sing-box最新正式版内核：$sbcore"
+curl -L -o "$CONFIG_DIR/sing-box.tar.gz" -# --retry 2 https://github.com/SagerNet/sing-box/releases/download/v$sbcore/$sbname.tar.gz
+if [[ -f "$CONFIG_DIR/sing-box.tar.gz" ]]; then
+    tar xzf "$CONFIG_DIR/sing-box.tar.gz" -C "$CONFIG_DIR"
+    mv "$CONFIG_DIR/$sbname/sing-box" "$CONFIG_DIR/"
+    rm -rf "$CONFIG_DIR/sing-box.tar.gz" "$CONFIG_DIR/$sbname"
+    chmod +x "$CONFIG_DIR/sing-box"
+else
+    echo "下载失败，请检测网络"
+    exit 1
+fi
+
+echo
+echo "当前vmess主协议端口：$port_vm_ws"
+echo
+echo "当前uuid密码：$UUID"
+echo
+
+op=$(cat /etc/redhat-release 2>/dev/null || cat /etc/os-release 2>/dev/null | grep -i pretty_name | cut -d \" -f2)
+if [[ $(echo "$op" | grep -i -E "arch") ]]; then
+red "脚本不支持当前的 $op 系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
+fi
+[[ -z $(systemd-detect-virt 2>/dev/null) ]] && vi=$(virt-what 2>/dev/null) || vi=$(systemd-detect-virt 2>/dev/null)
+hostname=$(hostname)
+export UUID=${uuid:-$UUID}
+export port_vm_ws=${vmpt:-$port_vm_ws}
+export ARGO_DOMAIN=${agn:-''}   
+export ARGO_AUTH=${agk:-''} 
+
+del(){
+    if [ "$release" = "Termux" ]; then
+        if [[ -n $(ps -ef | grep cloudflared) ]]; then
+            pkill -f cloudflared
+        fi
+        if [[ -n $(ps -ef | grep sing-box) ]]; then
+            pkill -f sing-box
+        fi
+        rm -rf "$CONFIG_DIR"
+    else
+        if [[ -n $(ps -e | grep cloudflared) ]]; then
+            kill -15 $(cat "$CONFIG_DIR/sbargopid.log" 2>/dev/null) >/dev/null 2>&1
+        fi
+        if [[ x"${release}" == x"alpine" ]]; then
+            rc-service sing-box stop
+            rc-update del sing-box default
+            rm /etc/init.d/sing-box -f
+        else
+            systemctl stop sing-box >/dev/null 2>&1
+            systemctl disable sing-box >/dev/null 2>&1
+            rm -f /etc/systemd/system/sing-box.service
+        fi
+        crontab -l > /tmp/crontab.tmp
+        sed -i '/sbargopid/d' /tmp/crontab.tmp
+        crontab /tmp/crontab.tmp
+        rm /tmp/crontab.tmp
+        rm -rf "$CONFIG_DIR"
+    fi
+    echo "卸载完成" 
+    exit
+}
+
+agn(){
+    if [ "$release" = "Termux" ]; then
+        argoname=$(cat "$CONFIG_DIR/sbargoym.log" 2>/dev/null)
+        if [ -z $argoname ]; then
+            argodomain=$(cat "$CONFIG_DIR/argo.log" 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
+            if [ -z $argodomain ]; then
+                echo "当前argo临时域名未生成，建议卸载重装" 
+            else
+                echo "当前argo最新临时域名：$argodomain"
+            fi
+        else
+            echo "当前argo固定域名：$argoname"
+            echo "当前argo固定域名token：$(cat "$CONFIG_DIR/sbargotoken.log" 2>/dev/null)"
+        fi
+    else
+        argoname=$(cat "$CONFIG_DIR/sbargoym.log" 2>/dev/null)
+        if [ -z $argoname ]; then
+            argodomain=$(cat "$CONFIG_DIR/argo.log" 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
+            if [ -z $argodomain ]; then
+                echo "当前argo临时域名未生成，建议卸载重装" 
+            else
+                echo "当前argo最新临时域名：$argodomain"
+            fi
+        else
+            echo "当前argo固定域名：$argoname"
+            echo "当前argo固定域名token：$(cat "$CONFIG_DIR/sbargotoken.log" 2>/dev/null)"
+        fi
+    fi
+    exit
+}
+
+if [[ "$1" == "del" ]]; then
+    del
+elif [[ "$1" == "agn" ]]; then
+    agn
+fi
+
+# 检查服务状态
+if [ "$release" = "Termux" ]; then
+    if [[ -n $(ps -ef | grep sing-box | grep -v grep) && -f "$CONFIG_DIR/sb.json" ]]; then
+        echo "ArgoSB脚本已在运行中" && exit
+    elif [[ -z $(ps -ef | grep sing-box | grep -v grep) && -f "$CONFIG_DIR/sb.json" ]]; then
+        echo "ArgoSB脚本已安装，但未启动，请卸载重装" && exit
+    else
+        echo "Termux系统"
+        echo "CPU架构：$cpu"
+        echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
+        echo
+    fi
+else
+    if [[ x"${release}" == x"alpine" ]]; then
+        status_cmd="rc-service sing-box status"
+        status_pattern="started"
+    else
+        status_cmd="systemctl status sing-box"
+        status_pattern="active"
+    fi
+    if [[ -n $($status_cmd 2>/dev/null | grep -w "$status_pattern") && -f "$CONFIG_DIR/sb.json" ]]; then
+        echo "ArgoSB脚本已在运行中" && exit
+    elif [[ -z $($status_cmd 2>/dev/null | grep -w "$status_pattern") && -f "$CONFIG_DIR/sb.json" ]]; then
+        echo "ArgoSB脚本已安装，但未启动，请卸载重装" && exit
+    else
+        echo "VPS系统：$op"
+        echo "CPU架构：$cpu"
+        echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
+        echo
     fi
 fi
 
