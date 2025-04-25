@@ -1,35 +1,50 @@
 #!/bin/bash
+
 gvinstall(){
-pkg install -y screen
-gvinstall(){
-  echo "正在安装GOST局域网共享代理 (Socks5端口:1080 / HTTP端口:8082)"
-  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+  # 安装screen
+  echo "正在安装screen..."
+  if command -v apt &> /dev/null; then
+    apt update && apt install -y screen
+  elif command -v apt-get &> /dev/null; then
+    apt-get update && apt-get install -y screen
+  elif command -v yum &> /dev/null; then
+    yum install -y screen
+  elif command -v pkg &> /dev/null; then
+    pkg install -y screen
+  else
+    echo "无法安装screen，请手动安装后再运行脚本"
+    exit 1
+  fi
   
-  # 设置固定端口
+  # 设置默认端口
   socks_port=1080
   http_port=8082
   
   # 下载GOST
-  echo "下载GOST中..."
-  curl -L -o gost_3.0.0_linux_arm64.tar.gz -# --retry 2 --insecure https://raw.githubusercontent.com/Knowitall-wiki/argosb/main/gost_3.0.0_linux_arm64.tar.gz
+  if [ ! -e gost ]; then
+    echo "下载中……"
+    curl -L -o gost_3.0.0_linux_arm64.tar.gz -# --retry 2 --insecure https://raw.githubusercontent.com/Knowitall-wiki/argosb/main/gost_3.0.0_linux_arm64.tar.gz
+    tar zxvf gost_3.0.0_linux_arm64.tar.gz
+  fi
   
-  # 检查下载是否成功
-  if [ ! -f gost_3.0.0_linux_arm64.tar.gz ]; then
-    echo "GOST下载失败，尝试备用链接..."
+  # 如果下载失败，尝试中转下载
+  if [ ! -e gost ]; then
+    echo "当前网络无法链接Github，切换中转下载"
     curl -L -o gost_3.0.0_linux_arm64.tar.gz -# --retry 2 --insecure https://gh-proxy.com/https://raw.githubusercontent.com/Knowitall-wiki/argosb/main/gost_3.0.0_linux_arm64.tar.gz
+    tar zxvf gost_3.0.0_linux_arm64.tar.gz
   fi
   
-  # 再次检查下载
-  if [ ! -f gost_3.0.0_linux_arm64.tar.gz ]; then
-    echo "GOST下载失败，请检查网络连接后重试" && exit 1
+  # 检查下载结果
+  if [ ! -e gost ]; then
+    echo "下载失败，请在代理环境下运行脚本" && exit 1
   fi
   
-  # 解压
-  tar zxvf gost_3.0.0_linux_arm64.tar.gz
+  # 清理不需要的文件
   rm -f gost_3.0.0_linux_arm64.tar.gz README* LICENSE* config.yaml
   
+  echo "使用 Socks5 端口：$socks_port 和 Http 端口：$http_port"
+  
   # 创建配置文件
-  echo "创建GOST配置..."
   cat > config.yaml <<EOF
 services:
   - name: service-socks5
@@ -73,19 +88,36 @@ resolvers:
         async: true
 EOF
   
-  # 创建启动脚本
-  echo "创建启动脚本..."
-  cat > gost_start.sh <<EOF
+  # 检测是否为Termux环境
+  if [ -d "/data/data/com.termux/files/usr/etc/profile.d" ]; then
+    # Termux环境
+    cd /data/data/com.termux/files/usr/etc/profile.d
+    cat > gost.sh <<EOF
+#!/data/data/com.termux/files/usr/bin/bash
+screen -wipe 2>/dev/null
+screen -ls | grep Detached | cut -d. -f1 | awk '{print \$1}' | xargs kill 2>/dev/null
+cd \$HOME
+screen -dmS myscreen bash -c './gost -C config.yaml'
+EOF
+    chmod +x gost.sh
+    # 立即启动
+    cd $HOME
+    screen -wipe 2>/dev/null
+    screen -ls | grep Detached | cut -d. -f1 | awk '{print $1}' | xargs kill 2>/dev/null
+    screen -dmS myscreen bash -c './gost -C config.yaml'
+  else
+    # 非Termux环境，创建启动脚本
+    cat > gost_start.sh <<EOF
 #!/bin/bash
-screen -wipe
-screen -ls | grep Detached | cut -d. -f1 | awk '{print \$1}' | xargs kill
+screen -wipe 2>/dev/null
+screen -ls | grep Detached | cut -d. -f1 | awk '{print \$1}' | xargs kill 2>/dev/null
 screen -dmS gost_screen ./gost -C config.yaml
 echo "GOST代理已启动"
 EOF
-  chmod +x gost_start.sh
-  
-  # 创建状态查询脚本
-  cat > gost_status.sh <<EOF
+    chmod +x gost_start.sh
+    
+    # 创建状态查询脚本
+    cat > gv.sh <<EOF
 #!/bin/bash
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 echo "GOST代理状态："
@@ -107,11 +139,11 @@ echo "Socks5代理: \$local_ip:${socks_port}"
 echo "HTTP代理: \$local_ip:${http_port}"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 EOF
-  chmod +x gost_status.sh
-  
-  # 启动GOST
-  echo "启动GOST代理服务..."
-  ./gost_start.sh
+    chmod +x gv.sh
+    
+    # 启动GOST
+    ./gost_start.sh
+  fi
   
   # 获取本机IP地址
   local_ip=$(ip -4 addr | grep -v "127.0.0.1" | grep "inet" | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
@@ -119,28 +151,28 @@ EOF
     local_ip="无法获取，请手动查看"
   fi
   
-  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-  echo "GOST代理安装完成！"
+  echo "安装完毕" 
   echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
   echo "本机IP: $local_ip"
   echo "Socks5代理: $local_ip:$socks_port"
   echo "HTTP代理: $local_ip:$http_port"
   echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-  echo "快捷命令："
-  echo "./gost_start.sh - 启动GOST代理"
-  echo "./gost_status.sh - 查看GOST代理状态"
-  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+  echo "快捷方式：bash gv.sh  可查看Socks5端口与Http端口"
+  echo "退出脚本运行：exit"
+  sleep 2
 }
 
-# 卸载GOST代理
 uninstall(){
-  echo "正在卸载GOST代理服务..."
-  screen -ls | grep gost_screen | cut -d. -f1 | awk '{print $1}' | xargs kill 2>/dev/null
-  rm -f gost config.yaml gost_start.sh gost_status.sh
-  echo "GOST代理服务已卸载完成"
+  screen -ls | grep Detached | cut -d. -f1 | awk '{print $1}' | xargs kill 2>/dev/null
+  rm -f gost config.yaml gv.sh gost_start.sh
+  
+  # 如果是Termux环境，删除profile.d中的启动脚本
+  if [ -f "/data/data/com.termux/files/usr/etc/profile.d/gost.sh" ]; then
+    rm -f /data/data/com.termux/files/usr/etc/profile.d/gost.sh
+  fi
+  
+  echo "卸载完毕"
 }
 
-# 自动安装GOST
+# 直接执行安装
 gvinstall
-
-exit 0
