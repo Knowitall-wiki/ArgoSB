@@ -7,18 +7,21 @@ echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 export LANG=en_US.UTF-8
 
-# 函数定义部分 - 所有函数都在这里定义
+# Termux环境检测
+if [ ! -d "/data/data/com.termux" ]; then
+    echo "当前不是Termux环境，请在Termux中运行此脚本"
+    exit 1
+fi
 
-# 检查网络连接
-check_network() {
-    echo "检查网络连接..."
-    if ! curl -s -m 4 https://www.google.com >/dev/null; then
-        if ! curl -s -m 4 https://www.baidu.com >/dev/null; then
-            echo "网络连接失败，请检查网络设置"
-            exit 1
-        fi
-    fi
-}
+# 创建工作目录
+WORK_DIR="$HOME/argo-sb"
+mkdir -p $WORK_DIR
+
+# 参数设置
+export UUID=${uuid:-''}
+export port_vm_ws=${vmpt:-''}
+export ARGO_DOMAIN=${agn:-''}   
+export ARGO_AUTH=${agk:-''} 
 
 # 卸载函数
 del(){
@@ -55,6 +58,25 @@ agn(){
     exit
 }
 
+# 处理命令行参数
+if [[ "$1" == "del" ]]; then
+    del
+elif [[ "$1" == "agn" ]]; then
+    agn
+fi
+
+# 检查是否已运行
+if [[ -n $(ps -ef | grep sing-box | grep -v grep) && -f "$WORK_DIR/sb.json" ]]; then
+    echo "ArgoSB脚本已在运行中" && exit
+elif [[ -z $(ps -ef | grep sing-box | grep -v grep) && -f "$WORK_DIR/sb.json" ]]; then
+    echo "ArgoSB脚本已安装，但未启动，请卸载重装" && exit
+else
+    echo "Termux环境"
+    echo "CPU架构：$(uname -m)"
+    echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
+    echo
+fi
+
 # 检查依赖
 check_dependencies() {
     local missing_deps=()
@@ -73,23 +95,20 @@ check_dependencies() {
     fi
 }
 
-# 生成UUID函数
-generate_uuid() {
-    if command -v python3 >/dev/null 2>&1; then
-        # 优先使用 Python 生成 UUID
-        UUID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
-    elif command -v uuidgen >/dev/null 2>&1; then
-        # 如果有 uuidgen 命令则使用
-        UUID=$(uuidgen)
-    elif [ -f "/proc/sys/kernel/random/uuid" ]; then
-        # 如果存在系统 UUID 文件则使用
-        UUID=$(cat /proc/sys/kernel/random/uuid)
-    else
-        # 如果以上方法都不可用，使用 OpenSSL 生成
-        UUID=$(openssl rand -hex 16 | awk '{print substr($0,1,8)-substr($0,9,4)-substr($0,13,4)-substr($0,17,4)-substr($0,21,12)}')
+check_dependencies
+
+# 检查网络连接
+check_network() {
+    echo "检查网络连接..."
+    if ! curl -s -m 4 https://www.google.com >/dev/null; then
+        if ! curl -s -m 4 https://www.baidu.com >/dev/null; then
+            echo "网络连接失败，请检查网络设置"
+            exit 1
+        fi
     fi
-    echo "$UUID" > "$WORK_DIR/uuid.txt"
 }
+
+check_network
 
 # 检查网络环境
 warpcheck(){
@@ -103,50 +122,6 @@ v4orv6(){
     fi
 }
 
-# 主脚本开始
-
-# Termux环境检测
-if [ ! -d "/data/data/com.termux" ]; then
-    echo "当前不是Termux环境，请在Termux中运行此脚本"
-    exit 1
-fi
-
-# 创建工作目录
-WORK_DIR="$HOME/argo-sb"
-mkdir -p $WORK_DIR
-
-# 参数设置
-export UUID=${uuid:-''}
-export port_vm_ws=${vmpt:-''}
-export ARGO_DOMAIN=${agn:-''}   
-export ARGO_AUTH=${agk:-''} 
-
-# 处理命令行参数
-if [[ "$1" == "del" ]]; then
-    del
-elif [[ "$1" == "agn" ]]; then
-    agn
-fi
-
-# 检查网络连接
-check_network
-
-# 检查是否已运行
-if [[ -n $(ps -ef | grep sing-box | grep -v grep) && -f "$WORK_DIR/sb.json" ]]; then
-    echo "ArgoSB脚本已在运行中" && exit
-elif [[ -z $(ps -ef | grep sing-box | grep -v grep) && -f "$WORK_DIR/sb.json" ]]; then
-    echo "ArgoSB脚本已安装，但未启动，请卸载重装" && exit
-else
-    echo "Termux环境"
-    echo "CPU架构：$(uname -m)"
-    echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
-    echo
-fi
-
-# 检查依赖
-check_dependencies
-
-# 检查网络环境
 warpcheck
 
 # 处理WARP环境
@@ -170,6 +145,23 @@ if [ -z $port_vm_ws ]; then
     port_vm_ws=$(python3 -c "import random; print(random.randint(10000, 65535))")
     echo "$port_vm_ws" > "$WORK_DIR/port.txt"
 fi
+
+generate_uuid() {
+    if command -v python3 >/dev/null 2>&1; then
+        # 优先使用 Python 生成 UUID
+        UUID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
+    elif command -v uuidgen >/dev/null 2>&1; then
+        # 如果有 uuidgen 命令则使用
+        UUID=$(uuidgen)
+    elif [ -f "/proc/sys/kernel/random/uuid" ]; then
+        # 如果存在系统 UUID 文件则使用
+        UUID=$(cat /proc/sys/kernel/random/uuid)
+    else
+        # 如果以上方法都不可用，使用 OpenSSL 生成
+        UUID=$(openssl rand -hex 16 | awk '{print substr($0,1,8)-substr($0,9,4)-substr($0,13,4)-substr($0,17,4)-substr($0,21,12)}')
+    fi
+    echo "$UUID" > "$WORK_DIR/uuid.txt"
+}
 
 if [ -z $UUID ]; then
     # 生成新的 UUID
@@ -421,144 +413,3 @@ echo "---------------------------------------------------------"
 echo "节点信息已保存到: $WORK_DIR/jh.txt"
 echo "保活脚本已启动，日志保存到: $HOME/keepalive.log"
 echo "---------------------------------------------------------"
-
-# 添加进程守护
-cat > $HOME/.termux/tasker/restart_services.sh <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
-# 重启Argo服务的脚本
-if ! pgrep -f "sing-box" > /dev/null; then
-  $WORK_DIR/sing-box run -c $WORK_DIR/sb.json > /dev/null 2>&1 &
-  echo \$! > $WORK_DIR/sing-box.pid
-fi
-
-if ! pgrep -f "cloudflared" > /dev/null; then
-  if [[ -n "\$(cat $WORK_DIR/sbargotoken.log 2>/dev/null)" ]]; then
-    $WORK_DIR/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token \$(cat $WORK_DIR/sbargotoken.log) >/dev/null 2>&1 &
-  else
-    $WORK_DIR/cloudflared tunnel --url http://localhost:$port_vm_ws --edge-ip-version auto --no-autoupdate --protocol http2 > $WORK_DIR/argo.log 2>&1 &
-  fi
-  echo \$! > $WORK_DIR/sbargopid.log
-fi
-EOF
-chmod +x $HOME/.termux/tasker/restart_services.sh
-
-# 创建分享命令
-cat > $PREFIX/bin/argoshare <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
-if [ -f "$WORK_DIR/jh.txt" ]; then
-  echo "节点分享链接："
-  cat $WORK_DIR/jh.txt
-  echo
-  echo "聚合分享链接："
-  base64 -w 0 < $WORK_DIR/jh.txt
-else
-  echo "未找到节点配置文件，请先运行安装脚本"
-fi
-EOF
-chmod +x $PREFIX/bin/argoshare
-
-# 创建状态检查命令
-cat > $PREFIX/bin/argostatus <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
-echo "Sing-Box状态："
-if pgrep -f "sing-box" > /dev/null; then
-  echo "  运行中 (PID: \$(cat $WORK_DIR/sing-box.pid 2>/dev/null))"
-else
-  echo "  未运行"
-fi
-
-echo "Cloudflared状态："
-if pgrep -f "cloudflared" > /dev/null; then
-  echo "  运行中 (PID: \$(cat $WORK_DIR/sbargopid.log 2>/dev/null))"
-else
-  echo "  未运行"
-fi
-
-echo "Argo域名信息："
-if [ -f "$WORK_DIR/sbargoym.log" ]; then
-  echo "  固定域名: \$(cat $WORK_DIR/sbargoym.log 2>/dev/null)"
-elif [ -f "$WORK_DIR/argo.log" ]; then
-  domain=\$(cat $WORK_DIR/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print \$2}' | awk '{print \$1}')
-  if [ -n "\$domain" ]; then
-    echo "  临时域名: \$domain"
-  else
-    echo "  未找到域名信息"
-  fi
-else
-  echo "  未找到域名信息"
-fi
-EOF
-chmod +x $PREFIX/bin/argostatus
-
-# 为保活增加额外机制
-if [ ! -d "$HOME/.termux/tasker" ]; then
-    mkdir -p $HOME/.termux/tasker
-fi
-
-# 创建启动所有服务的命令
-cat > $PREFIX/bin/argostart <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
-echo "启动Sing-Box和Cloudflared服务..."
-
-if [ -f "$WORK_DIR/sb.json" ]; then
-  # 先杀掉可能存在的旧进程
-  pkill -f "sing-box" >/dev/null 2>&1
-  pkill -f "cloudflared" >/dev/null 2>&1
-  sleep 1
-  
-  # 启动sing-box
-  $WORK_DIR/sing-box run -c $WORK_DIR/sb.json > /dev/null 2>&1 &
-  echo \$! > $WORK_DIR/sing-box.pid
-  echo "Sing-Box已启动"
-  
-  # 启动cloudflared
-  if [ -f "$WORK_DIR/sbargotoken.log" ]; then
-    $WORK_DIR/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token \$(cat $WORK_DIR/sbargotoken.log) >/dev/null 2>&1 &
-    echo "Cloudflared固定隧道已启动"
-  else
-    $WORK_DIR/cloudflared tunnel --url http://localhost:\$(cat $WORK_DIR/port.txt) --edge-ip-version auto --no-autoupdate --protocol http2 > $WORK_DIR/argo.log 2>&1 &
-    echo "Cloudflared临时隧道已启动"
-  fi
-  echo \$! > $WORK_DIR/sbargopid.log
-  
-  # 启动保活脚本
-  if [ -f "$HOME/keepalive.sh" ]; then
-    pkill -f "keepalive.sh" >/dev/null 2>&1
-    nohup $HOME/keepalive.sh > /dev/null 2>&1 &
-    echo "保活脚本已启动"
-  fi
-  
-  echo "所有服务已启动，使用 'argostatus' 检查状态"
-else
-  echo "未找到配置文件，请先运行安装脚本"
-fi
-EOF
-chmod +x $PREFIX/bin/argostart
-
-# 创建停止所有服务的命令
-cat > $PREFIX/bin/argostop <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
-echo "停止所有Argo服务..."
-
-# 停止进程
-pkill -f "sing-box" >/dev/null 2>&1
-pkill -f "cloudflared" >/dev/null 2>&1
-pkill -f "keepalive.sh" >/dev/null 2>&1
-
-echo "所有服务已停止"
-EOF
-chmod +x $PREFIX/bin/argostop
-
-echo
-echo "-----------------------------------------------------------"
-echo "安装完成！您现在可以使用以下命令管理服务："
-echo
-echo "  argostatus  - 查看服务状态和域名信息"
-echo "  argoshare   - 显示节点分享链接"
-echo "  argostart   - 启动所有服务"
-echo "  argostop    - 停止所有服务"
-echo 
-echo "配置信息保存在: $WORK_DIR 目录"
-echo "-----------------------------------------------------------"
-echo
-
