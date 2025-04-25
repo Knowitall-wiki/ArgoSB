@@ -614,15 +614,12 @@ echo
 echo "---------------------------------------------------------"
 echo
 // ... existing code ...
-# 生成 keepalive.sh 保活脚本
+# 生成保活脚本 keepalive.sh
 cat > /keepalive.sh <<EOF
 #!/bin/bash
 
-# 配置
-CHECK_INTERVAL_SECONDS=300  # 检查间隔（5分钟）
-TAP_X_COORD=500            # 模拟点击的X坐标
-TAP_Y_COORD=1000           # 模拟点击的Y坐标
-LOG_FILE="/root/keepalive.log"  # 放在当前用户目录下
+CHECK_INTERVAL_SECONDS=300
+LOG_FILE="/root/keepalive.log"
 
 echo "启动保活脚本..." > \$LOG_FILE
 echo "检查间隔: \${CHECK_INTERVAL_SECONDS} 秒" >> \$LOG_FILE
@@ -630,11 +627,7 @@ echo "检查间隔: \${CHECK_INTERVAL_SECONDS} 秒" >> \$LOG_FILE
 while true; do
   TIMESTAMP=\$(date "+%Y-%m-%d %H:%M:%S")
   echo "\$TIMESTAMP: 执行保活操作..." >> \$LOG_FILE
-
-  # 模拟活动操作 - 由于input命令不可用，我们使用其他命令代替
   echo "\$TIMESTAMP: 执行系统操作..." >> \$LOG_FILE
-
-  # 执行一些基本命令来保持活动
   ls -la / > /dev/null
   ps aux > /dev/null
   free -m > /dev/null
