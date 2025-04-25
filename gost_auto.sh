@@ -1,6 +1,6 @@
 #!/bin/bash
-
-# 自动安装GOST局域网共享代理
+gvinstall(){
+pkg install -y screen
 gvinstall(){
   echo "正在安装GOST局域网共享代理 (Socks5端口:1080 / HTTP端口:8082)"
   echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
