@@ -158,33 +158,46 @@ if [[ -n $argodomain ]]; then
     # 创建节点文件
     touch $INSTALL_DIR/jh.txt
     
-    # 生成多个节点配置 - 严格按照原始脚本格式
-    vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    # 修复后的节点配置生成部分 - 确保JSON格式正确
+    vmatls_link1="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-tls-argo-$hostname-443\",\"add\":\"104.16.0.0\",\"port\":\"443\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"tls\",\"sni\":\"$argodomain\",\"alpn\":\"\",\"fp\":\"\"}" | base64 -w0)"
     echo "$vmatls_link1" > $INSTALL_DIR/jh.txt
-    vmatls_link2="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-8443\", \"add\": \"104.17.0.0\", \"port\": \"8443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    
+    vmatls_link2="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-tls-argo-$hostname-8443\",\"add\":\"104.17.0.0\",\"port\":\"8443\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"tls\",\"sni\":\"$argodomain\",\"alpn\":\"\",\"fp\":\"\"}" | base64 -w0)"
     echo "$vmatls_link2" >> $INSTALL_DIR/jh.txt
-    vmatls_link3="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2053\", \"add\": \"104.18.0.0\", \"port\": \"2053\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    
+    vmatls_link3="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-tls-argo-$hostname-2053\",\"add\":\"104.18.0.0\",\"port\":\"2053\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"tls\",\"sni\":\"$argodomain\",\"alpn\":\"\",\"fp\":\"\"}" | base64 -w0)"
     echo "$vmatls_link3" >> $INSTALL_DIR/jh.txt
-    vmatls_link4="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2083\", \"add\": \"104.19.0.0\", \"port\": \"2083\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    
+    vmatls_link4="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-tls-argo-$hostname-2083\",\"add\":\"104.19.0.0\",\"port\":\"2083\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"tls\",\"sni\":\"$argodomain\",\"alpn\":\"\",\"fp\":\"\"}" | base64 -w0)"
     echo "$vmatls_link4" >> $INSTALL_DIR/jh.txt
-    vmatls_link5="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2087\", \"add\": \"104.20.0.0\", \"port\": \"2087\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    
+    vmatls_link5="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-tls-argo-$hostname-2087\",\"add\":\"104.20.0.0\",\"port\":\"2087\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"tls\",\"sni\":\"$argodomain\",\"alpn\":\"\",\"fp\":\"\"}" | base64 -w0)"
     echo "$vmatls_link5" >> $INSTALL_DIR/jh.txt
-    vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2096\", \"add\": \"[2606:4700::]\", \"port\": \"2096\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    
+    vmatls_link6="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-tls-argo-$hostname-2096\",\"add\":\"[2606:4700::]\",\"port\":\"2096\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"tls\",\"sni\":\"$argodomain\",\"alpn\":\"\",\"fp\":\"\"}" | base64 -w0)"
     echo "$vmatls_link6" >> $INSTALL_DIR/jh.txt
-    vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-80\", \"add\": \"104.21.0.0\", \"port\": \"80\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    
+    vma_link7="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-argo-$hostname-80\",\"add\":\"104.21.0.0\",\"port\":\"80\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"\"}" | base64 -w0)"
     echo "$vma_link7" >> $INSTALL_DIR/jh.txt
-    vma_link8="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8080\", \"add\": \"104.22.0.0\", \"port\": \"8080\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    
+    vma_link8="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-argo-$hostname-8080\",\"add\":\"104.22.0.0\",\"port\":\"8080\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"\"}" | base64 -w0)"
     echo "$vma_link8" >> $INSTALL_DIR/jh.txt
-    vma_link9="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8880\", \"add\": \"104.24.0.0\", \"port\": \"8880\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    
+    vma_link9="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-argo-$hostname-8880\",\"add\":\"104.24.0.0\",\"port\":\"8880\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"\"}" | base64 -w0)"
     echo "$vma_link9" >> $INSTALL_DIR/jh.txt
-    vma_link10="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2052\", \"add\": \"104.25.0.0\", \"port\": \"2052\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    
+    vma_link10="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-argo-$hostname-2052\",\"add\":\"104.25.0.0\",\"port\":\"2052\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"\"}" | base64 -w0)"
     echo "$vma_link10" >> $INSTALL_DIR/jh.txt
-    vma_link11="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2082\", \"add\": \"104.26.0.0\", \"port\": \"2082\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    
+    vma_link11="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-argo-$hostname-2082\",\"add\":\"104.26.0.0\",\"port\":\"2082\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"\"}" | base64 -w0)"
     echo "$vma_link11" >> $INSTALL_DIR/jh.txt
-    vma_link12="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2086\", \"add\": \"104.27.0.0\", \"port\": \"2086\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    
+    vma_link12="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-argo-$hostname-2086\",\"add\":\"104.27.0.0\",\"port\":\"2086\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"\"}" | base64 -w0)"
     echo "$vma_link12" >> $INSTALL_DIR/jh.txt
-    vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::]\", \"port\": \"2095\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    
+    vma_link13="vmess://$(echo "{\"v\":\"2\",\"ps\":\"vmess-ws-argo-$hostname-2095\",\"add\":\"[2400:cb00:2049::]\",\"port\":\"2095\",\"id\":\"$UUID\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"$argodomain\",\"path\":\"/$UUID-vm?ed=2048\",\"tls\":\"\"}" | base64 -w0)"
     echo "$vma_link13" >> $INSTALL_DIR/jh.txt
+    
     baseurl=$(base64 -w 0 < $INSTALL_DIR/jh.txt)
     
     echo "ArgoSB脚本安装完毕"
