@@ -2,7 +2,7 @@
 
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "knowitall 谷歌手机pixel Termux专用一键节点生成脚本"
-echo "当前版本：25.4.25 Termux专用版"
+echo "当前版本：25.4.25 Termux专用增强版"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
 # Termux目录
@@ -146,7 +146,6 @@ $INSTALL_DIR/start.sh
 echo "申请Argo临时隧道中……请稍等"
 sleep 10
 
-
 # 获取Argo域名
 argodomain=$(cat $INSTALL_DIR/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
 
@@ -157,51 +156,63 @@ if [[ -n $argodomain ]]; then
     hostname=$(hostname)
     
     # 创建节点文件
-    touch $INSTALL_DIR/node.txt
+    touch $INSTALL_DIR/jh.txt
     
-    # 生成多个节点配置
-    # 443端口TLS节点
+    # 生成多个节点配置 - 严格按照原始脚本格式
     vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link1" > $INSTALL_DIR/node.txt
-    
-    # 8443端口TLS节点
+    echo "$vmatls_link1" > $INSTALL_DIR/jh.txt
     vmatls_link2="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-8443\", \"add\": \"104.17.0.0\", \"port\": \"8443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link2" >> $INSTALL_DIR/node.txt
-    
-    # 2053端口TLS节点
+    echo "$vmatls_link2" >> $INSTALL_DIR/jh.txt
     vmatls_link3="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2053\", \"add\": \"104.18.0.0\", \"port\": \"2053\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-    echo "$vmatls_link3" >> $INSTALL_DIR/node.txt
-    
-    # 80端口非TLS节点
+    echo "$vmatls_link3" >> $INSTALL_DIR/jh.txt
+    vmatls_link4="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2083\", \"add\": \"104.19.0.0\", \"port\": \"2083\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    echo "$vmatls_link4" >> $INSTALL_DIR/jh.txt
+    vmatls_link5="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2087\", \"add\": \"104.20.0.0\", \"port\": \"2087\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    echo "$vmatls_link5" >> $INSTALL_DIR/jh.txt
+    vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2096\", \"add\": \"[2606:4700::]\", \"port\": \"2096\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+    echo "$vmatls_link6" >> $INSTALL_DIR/jh.txt
     vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-80\", \"add\": \"104.21.0.0\", \"port\": \"80\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link7" >> $INSTALL_DIR/node.txt
-    
-    # 8080端口非TLS节点
+    echo "$vma_link7" >> $INSTALL_DIR/jh.txt
     vma_link8="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8080\", \"add\": \"104.22.0.0\", \"port\": \"8080\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-    echo "$vma_link8" >> $INSTALL_DIR/node.txt
+    echo "$vma_link8" >> $INSTALL_DIR/jh.txt
+    vma_link9="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8880\", \"add\": \"104.24.0.0\", \"port\": \"8880\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    echo "$vma_link9" >> $INSTALL_DIR/jh.txt
+    vma_link10="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2052\", \"add\": \"104.25.0.0\", \"port\": \"2052\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    echo "$vma_link10" >> $INSTALL_DIR/jh.txt
+    vma_link11="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2082\", \"add\": \"104.26.0.0\", \"port\": \"2082\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    echo "$vma_link11" >> $INSTALL_DIR/jh.txt
+    vma_link12="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2086\", \"add\": \"104.27.0.0\", \"port\": \"2086\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    echo "$vma_link12" >> $INSTALL_DIR/jh.txt
+    vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::]\", \"port\": \"2095\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+    echo "$vma_link13" >> $INSTALL_DIR/jh.txt
+    baseurl=$(base64 -w 0 < $INSTALL_DIR/jh.txt)
     
-    # 生成聚合分享链接
-    baseurl=$(base64 -w 0 < $INSTALL_DIR/node.txt)
-    
-    echo "脚本安装完毕"
+    echo "ArgoSB脚本安装完毕"
     echo "---------------------------------------------------------"
-    echo "输出配置信息"
+    echo "---------------------------------------------------------"
+    echo "输出配置信息" && sleep 3
     echo
     echo "443端口的vmess-ws-tls-argo节点，默认优选IPV4：104.16.0.0"
-    sed -n '1p' $INSTALL_DIR/node.txt
+    sed -n '1p' $INSTALL_DIR/jh.txt
+    echo
+    echo "2096端口的vmess-ws-tls-argo节点，默认优选IPV6：[2606:4700::]（本地网络支持IPV6才可用）"
+    sed -n '6p' $INSTALL_DIR/jh.txt
     echo
     echo "80端口的vmess-ws-argo节点，默认优选IPV4：104.21.0.0"
-    sed -n '4p' $INSTALL_DIR/node.txt
+    sed -n '7p' $INSTALL_DIR/jh.txt
+    echo
+    echo "2095端口的vmess-ws-argo节点，默认优选IPV6：[2400:cb00:2049::]（本地网络支持IPV6才可用）"
+    sed -n '13p' $INSTALL_DIR/jh.txt
     echo
     echo "---------------------------------------------------------"
-    echo "聚合分享Argo节点链接："
+    echo "聚合分享Argo节点13个端口及不死IP全覆盖：7个关tls 80系端口节点、6个开tls 443系端口节点" && sleep 3
     echo
     echo $baseurl
     echo
     echo "---------------------------------------------------------"
     echo "启动命令: $INSTALL_DIR/start.sh"
     echo "停止命令: $INSTALL_DIR/stop.sh"
-    echo "节点信息保存在: $INSTALL_DIR/node.txt"
+    echo "节点信息保存在: $INSTALL_DIR/jh.txt"
 else
     echo "Argo临时隧道申请失败，请稍后再试"
     $INSTALL_DIR/stop.sh
