@@ -261,50 +261,59 @@ curl -L -o $WORK_DIR/cloudflared -# --retry 2 https://github.com/cloudflare/clou
 chmod +x $WORK_DIR/cloudflared
 
 # 启动Argo隧道
-if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-    name='固定'
-    $WORK_DIR/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH} >/dev/null 2>&1 & 
-    echo "$!" > $WORK_DIR/sbargopid.log
-    echo ${ARGO_DOMAIN} > $WORK_DIR/sbargoym.log
-    echo ${ARGO_AUTH} > $WORK_DIR/sbargotoken.log
-else
-    name='临时'
-    $WORK_DIR/cloudflared tunnel --url http://localhost:$port_vm_ws --edge-ip-version auto --no-autoupdate --protocol http2 > $WORK_DIR/argo.log 2>&1 &
-    echo "$!" > $WORK_DIR/sbargopid.log
-fi
+MAX_RETRY=5  # 最大重试次数
+RETRY_COUNT=0
+RETRY_INTERVAL=10  # 重试间隔（秒）
 
-echo "申请Argo$name隧道中……请稍等"
-sleep 8
+start_argo_tunnel() {
+    if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
+        name='固定'
+        $WORK_DIR/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH} >/dev/null 2>&1 & 
+        echo "$!" > $WORK_DIR/sbargopid.log
+        echo ${ARGO_DOMAIN} > $WORK_DIR/sbargoym.log
+        echo ${ARGO_AUTH} > $WORK_DIR/sbargotoken.log
+    else
+        name='临时'
+        $WORK_DIR/cloudflared tunnel --url http://localhost:$port_vm_ws --edge-ip-version auto --no-autoupdate --protocol http2 > $WORK_DIR/argo.log 2>&1 &
+        echo "$!" > $WORK_DIR/sbargopid.log
+    fi
 
-# 获取Argo域名
-if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
-    argodomain=$(cat $WORK_DIR/sbargoym.log 2>/dev/null)
-else
-    argodomain=$(cat $WORK_DIR/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
-fi
+    echo "申请Argo$name隧道中……请稍等"
+    sleep 8
 
-if [[ -n $argodomain ]]; then
-    echo "Argo$name隧道申请成功，域名为：$argodomain"
-else
-    echo "Argo$name隧道申请失败，请稍后再试" && exit
-fi
+    # 获取Argo域名
+    if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
+        argodomain=$(cat $WORK_DIR/sbargoym.log 2>/dev/null)
+    else
+        argodomain=$(cat $WORK_DIR/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
+    fi
 
-# 设置开机自启
-mkdir -p $HOME/.termux/boot
-cat > $HOME/.termux/boot/start-argo-sb.sh <<EOF
-#!/data/data/com.termux/files/usr/bin/bash
-$WORK_DIR/sing-box run -c $WORK_DIR/sb.json > /dev/null 2>&1 &
-echo \$! > $WORK_DIR/sing-box.pid
+    if [[ -n $argodomain ]]; then
+        echo "Argo$name隧道申请成功，域名为：$argodomain"
+        return 0
+    else
+        echo "Argo$name隧道申请失败，正在重试..."
+        return 1
+    fi
+}
 
-if [[ -n "\$(cat $WORK_DIR/sbargotoken.log 2>/dev/null)" ]]; then
-    $WORK_DIR/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token \$(cat $WORK_DIR/sbargotoken.log) >/dev/null 2>&1 &
-    echo \$! > $WORK_DIR/sbargopid.log
-else
-    $WORK_DIR/cloudflared tunnel --url http://localhost:$port_vm_ws --edge-ip-version auto --no-autoupdate --protocol http2 > $WORK_DIR/argo.log 2>&1 &
-    echo \$! > $WORK_DIR/sbargopid.log
-fi
-EOF
-chmod +x $HOME/.termux/boot/start-argo-sb.sh
+# 开始申请隧道并在失败时重试
+while true; do
+    if start_argo_tunnel; then
+        break
+    else
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -ge $MAX_RETRY ]; then
+            echo "已达到最大重试次数($MAX_RETRY)，隧道申请失败。"
+            echo "请检查网络连接或稍后再试。"
+            exit 1
+        fi
+        echo "第 $RETRY_COUNT 次重试，共 $MAX_RETRY 次..."
+        # 清理之前的进程
+        pkill -f "cloudflared"
+        sleep $RETRY_INTERVAL
+    fi
+done
 
 # 生成节点链接
 hostname=$(hostname 2>/dev/null || echo "termux")
