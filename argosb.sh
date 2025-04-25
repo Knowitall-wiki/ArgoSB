@@ -1,7 +1,300 @@
 #!/bin/bash
+
+# gost局域网共享代理安装函数
+install_gost_proxy() {
+  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
+  echo "正在安装GOST局域网共享代理 (Socks5端口:1080 / HTTP端口:8082)"
+  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+  
+  mkdir -p /etc/gost
+  cd /etc/gost
+  
+  # 设置固定端口
+  socks_port=1080
+  http_port=8082
+  
+  # 下载GOST
+  echo "下载GOST中..."
+  if [[ "$cpu" == "arm64" ]]; then
+    curl -L -o gost.tar.gz -# --retry 2 --insecure https://raw.githubusercontent.com/Knowitall-wiki/argosb/main/gost_3.0.0_linux_arm64.tar.gz
+  else
+    curl -L -o gost.tar.gz -# --retry 2 --insecure https://github.com/go-gost/gost/releases/download/v3.0.0/gost_3.0.0_linux_amd64.tar.gz
+  fi
+  
+  # 检查下载是否成功
+  if [[ ! -f gost.tar.gz ]]; then
+    echo "GOST下载失败，尝试备用链接..."
+    if [[ "$cpu" == "arm64" ]]; then
+      curl -L -o gost.tar.gz -# --retry 2 --insecure https://gh-proxy.com/https://raw.githubusercontent.com/Knowitall-wiki/argosb/main/gost_3.0.0_linux_arm64.tar.gz
+    else
+      curl -L -o gost.tar.gz -# --retry 2 --insecure https://gh-proxy.com/https://github.com/go-gost/gost/releases/download/v3.0.0/gost_3.0.0_linux_amd64.tar.gz
+    fi
+  fi
+  
+  # 再次检查下载
+  if [[ ! -f gost.tar.gz ]]; then
+    echo "GOST下载失败，请检查网络连接后重试" && return 1
+  fi
+  
+  # 解压
+  tar zxvf gost.tar.gz
+  rm -f gost.tar.gz README* LICENSE* config.yaml
+  
+  # 创建配置文件
+  echo "创建GOST配置..."
+  cat > config.yaml <<EOF
+services:
+  - name: service-socks5
+    addr: :${socks_port}
+    resolver: resolver-0
+    handler:
+      type: socks5
+      metadata:
+        udp: true
+        udpbuffersize: 4096
+    listener:
+      type: tcp
+  - name: service-http
+    addr: :${http_port}
+    resolver: resolver-0
+    handler:
+      type: http
+      metadata:
+        udp: true
+        udpbuffersize: 4096
+    listener:
+      type: tcp
+resolvers:
+  - name: resolver-0
+    nameservers:
+      - addr: tls://8.8.8.8:853
+        prefer: ipv4
+        ttl: 5m0s
+        async: true
+      - addr: tls://8.8.4.4:853
+        prefer: ipv4
+        ttl: 5m0s
+        async: true
+      - addr: tls://[2001:4860:4860::8888]:853
+        prefer: ipv6
+        ttl: 5m0s
+        async: true
+      - addr: tls://[2001:4860:4860::8844]:853
+        prefer: ipv6
+        ttl: 5m0s
+        async: true
+EOF
+  
+  # 创建系统服务
+  if [[ x"${release}" == x"alpine" ]]; then
+    cat > /etc/init.d/gost <<EOF
+#!/sbin/openrc-run
+description="GOST proxy service"
+command="/etc/gost/gost"
+command_args="-C /etc/gost/config.yaml"
+command_background=true
+pidfile="/var/run/gost.pid"
+EOF
+    chmod +x /etc/init.d/gost
+    rc-update add gost default
+    rc-service gost start
+  else
+    cat > /etc/systemd/system/gost.service <<EOF
+[Unit]
+Description=GOST Proxy Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/gost
+ExecStart=/etc/gost/gost -C /etc/gost/config.yaml
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=infinity
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable gost
+    systemctl start gost
+  fi
+  
+  # 检查GOST是否成功启动
+  sleep 2
+  if [[ x"${release}" == x"alpine" ]]; then
+    if rc-service gost status | grep -q "started"; then
+      echo "GOST代理服务启动成功！"
+    else
+      echo "GOST代理服务启动失败，请检查日志"
+      return 1
+    fi
+  else
+    if systemctl is-active --quiet gost; then
+      echo "GOST代理服务启动成功！"
+    else
+      echo "GOST代理服务启动失败，请检查日志"
+      return 1
+    fi
+  fi
+  
+  # 获取本机IP地址
+  local_ip=$(ip -4 addr | grep -v "127.0.0.1" | grep "inet" | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
+  if [[ -z "$local_ip" ]]; then
+    local_ip="无法获取，请手动查看"
+  fi
+  
+  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+  echo "GOST代理安装完成！"
+  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+  echo "本机IP: $local_ip"
+  echo "Socks5代理: $local_ip:$socks_port"
+  echo "HTTP代理: $local_ip:$http_port"
+  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+}
+
+# GOST代理卸载函数
+uninstall_gost_proxy() {
+  echo "正在卸载GOST代理服务..."
+  
+  if [[ x"${release}" == x"alpine" ]]; then
+    rc-service gost stop
+    rc-update del gost default
+    rm /etc/init.d/gost -f
+  else
+    systemctl stop gost
+    systemctl disable gost
+    rm -f /etc/systemd/system/gost.service
+  fi
+  
+  rm -rf /etc/gost
+  echo "GOST代理服务已卸载完成"
+}
+
+# GOST代理状态查询函数
+check_gost_status() {
+  if [[ ! -d "/etc/gost" ]]; then
+    echo "GOST代理未安装"
+    return
+  fi
+  
+  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+  echo "GOST代理状态："
+  
+  if [[ x"${release}" == x"alpine" ]]; then
+    if rc-service gost status | grep -q "started"; then
+      echo "运行状态: 正在运行"
+    else
+      echo "运行状态: 未运行"
+    fi
+  else
+    if systemctl is-active --quiet gost; then
+      echo "运行状态: 正在运行"
+    else
+      echo "运行状态: 未运行"
+    fi
+  fi
+  
+  # 获取本机IP地址
+  local_ip=$(ip -4 addr | grep -v "127.0.0.1" | grep "inet" | awk '{print $2}' | cut -d'/' -f1 | head -n 1)
+  if [[ -z "$local_ip" ]]; then
+    local_ip="无法获取，请手动查看"
+  fi
+  
+  echo "本机IP: $local_ip"
+  echo "Socks5代理: $local_ip:1080"
+  echo "HTTP代理: $local_ip:8082"
+  echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+}
+
+# 处理gost相关命令
+if [[ "$1" == "gost" ]]; then
+  export LANG=en_US.UTF-8
+  [[ $EUID -ne 0 ]] && echo "请以root模式运行脚本" && exit
+  if [[ -f /etc/redhat-release ]]; then
+    release="Centos"
+  elif cat /etc/issue | grep -q -E -i "alpine"; then
+    release="alpine"
+  elif cat /etc/issue | grep -q -E -i "debian"; then
+    release="Debian"
+  elif cat /etc/issue | grep -q -E -i "ubuntu"; then
+    release="Ubuntu"
+  elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
+    release="Centos"
+  elif cat /proc/version | grep -q -E -i "debian"; then
+    release="Debian"
+  elif cat /proc/version | grep -q -E -i "ubuntu"; then
+    release="Ubuntu"
+  elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
+    release="Centos"
+  else 
+    echo "脚本不支持当前的系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
+  fi
+  case $(uname -m) in
+  aarch64) cpu=arm64;;
+  x86_64) cpu=amd64;;
+  *) echo "目前脚本不支持$(uname -m)架构" && exit;;
+  esac
+  install_gost_proxy
+  exit
+elif [[ "$1" == "gost_del" ]]; then
+  export LANG=en_US.UTF-8
+  [[ $EUID -ne 0 ]] && echo "请以root模式运行脚本" && exit
+  if [[ -f /etc/redhat-release ]]; then
+    release="Centos"
+  elif cat /etc/issue | grep -q -E -i "alpine"; then
+    release="alpine"
+  elif cat /etc/issue | grep -q -E -i "debian"; then
+    release="Debian"
+  elif cat /etc/issue | grep -q -E -i "ubuntu"; then
+    release="Ubuntu"
+  elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
+    release="Centos"
+  elif cat /proc/version | grep -q -E -i "debian"; then
+    release="Debian"
+  elif cat /proc/version | grep -q -E -i "ubuntu"; then
+    release="Ubuntu"
+  elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
+    release="Centos"
+  else 
+    echo "脚本不支持当前的系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
+  fi
+  uninstall_gost_proxy
+  exit
+elif [[ "$1" == "gost_status" ]]; then
+  export LANG=en_US.UTF-8
+  [[ $EUID -ne 0 ]] && echo "请以root模式运行脚本" && exit
+  if [[ -f /etc/redhat-release ]]; then
+    release="Centos"
+  elif cat /etc/issue | grep -q -E -i "alpine"; then
+    release="alpine"
+  elif cat /etc/issue | grep -q -E -i "debian"; then
+    release="Debian"
+  elif cat /etc/issue | grep -q -E -i "ubuntu"; then
+    release="Ubuntu"
+  elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
+    release="Centos"
+  elif cat /proc/version | grep -q -E -i "debian"; then
+    release="Debian"
+  elif cat /proc/version | grep -q -E -i "ubuntu"; then
+    release="Ubuntu"
+  elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
+    release="Centos"
+  else 
+    echo "脚本不支持当前的系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
+  fi
+  check_gost_status
+  exit
+fi
+
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "knowitall 谷歌手机pixel一键节点生成脚本走系统代理改197行"
 echo "当前版本：25.4.22 测试beta2版"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+echo "gost        - 安装GOST局域网共享代理(Socks5:1080/HTTP:8082)"
+echo "gost_del    - 卸载GOST局域网共享代理"
+echo "gost_status - 查看GOST代理状态"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 export LANG=en_US.UTF-8
 [[ $EUID -ne 0 ]] && yellow "请以root模式运行脚本" && exit
