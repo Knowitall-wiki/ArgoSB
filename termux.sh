@@ -260,11 +260,65 @@ echo "下载cloudflared-argo最新正式版内核：$argocore"
 curl -L -o $WORK_DIR/cloudflared -# --retry 2 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-android-$cpu
 chmod +x $WORK_DIR/cloudflared
 
-# 启动Argo隧道
-MAX_RETRY=5  # 最大重试次数
-RETRY_COUNT=0
-RETRY_INTERVAL=10  # 重试间隔（秒）
+# 添加诊断函数
+check_tunnel_status() {
+    echo "开始诊断隧道问题..."
+    
+    # 检查sing-box状态
+    if ! pgrep -f "sing-box" > /dev/null; then
+        echo "错误: sing-box未运行"
+        echo "尝试重启sing-box..."
+        pkill -f "sing-box"
+        sleep 2
+        $WORK_DIR/sing-box run -c $WORK_DIR/sb.json > /dev/null 2>&1 &
+        echo $! > $WORK_DIR/sing-box.pid
+        sleep 3
+    fi
+    
+    # 检查端口占用
+    if netstat -tuln | grep -q ":$port_vm_ws "; then
+        echo "警告: 端口 $port_vm_ws 已被占用"
+        echo "尝试更换端口..."
+        port_vm_ws=$(python3 -c "import random; print(random.randint(10000, 65535))")
+        echo "$port_vm_ws" > "$WORK_DIR/port.txt"
+        # 更新配置文件中的端口
+        sed -i "s/\"listen_port\": [0-9]*/\"listen_port\": $port_vm_ws/" $WORK_DIR/sb.json
+        # 重启sing-box
+        pkill -f "sing-box"
+        sleep 2
+        $WORK_DIR/sing-box run -c $WORK_DIR/sb.json > /dev/null 2>&1 &
+        echo $! > $WORK_DIR/sing-box.pid
+    fi
+    
+    # 检查网络连接
+    echo "检查网络连接..."
+    if ! curl -s -m 4 https://cloudflare.com >/dev/null; then
+        echo "错误: 无法连接到Cloudflare服务器"
+        echo "请检查网络连接或DNS设置"
+    fi
+    
+    # 检查DNS解析
+    echo "检查DNS解析..."
+    if ! nslookup cloudflare.com >/dev/null 2>&1; then
+        echo "警告: DNS解析可能存在问题"
+        echo "尝试使用备用DNS..."
+        echo "nameserver 1.1.1.1" > $PREFIX/etc/resolv.conf
+        echo "nameserver 8.8.8.8" >> $PREFIX/etc/resolv.conf
+    fi
+    
+    # 检查cloudflared日志
+    if [ -f "$WORK_DIR/argo.log" ]; then
+        echo "分析cloudflared日志..."
+        if grep -q "error" "$WORK_DIR/argo.log"; then
+            echo "发现错误日志:"
+            grep "error" "$WORK_DIR/argo.log" | tail -n 3
+        fi
+    fi
+    
+    echo "诊断完成"
+}
 
+# 修改start_argo_tunnel函数为原始脚本的方式
 start_argo_tunnel() {
     if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
         name='固定'
@@ -281,7 +335,6 @@ start_argo_tunnel() {
     echo "申请Argo$name隧道中……请稍等"
     sleep 8
 
-    # 获取Argo域名
     if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
         argodomain=$(cat $WORK_DIR/sbargoym.log 2>/dev/null)
     else
@@ -292,8 +345,8 @@ start_argo_tunnel() {
         echo "Argo$name隧道申请成功，域名为：$argodomain"
         return 0
     else
-        echo "Argo$name隧道申请失败，正在重试..."
-        return 1
+        echo "Argo$name隧道申请失败，请稍后再试"
+        exit 1
     fi
 }
 
