@@ -320,3 +320,120 @@ echo $baseurl
 echo
 echo "---------------------------------------------------------"
 echo
+
+# 生成保活脚本函数
+generate_keepalive() {
+  echo "正在生成保活脚本..."
+  
+  cat > /root/keepalive.sh <<EOF
+#!/bin/bash
+
+# 配置
+CHECK_INTERVAL_SECONDS=300  # 检查间隔（5分钟）
+TAP_X_COORD=500            # 模拟点击的X坐标
+TAP_Y_COORD=1000           # 模拟点击的Y坐标
+LOG_FILE="/root/keepalive.log"  # 放在当前用户目录下
+
+echo "启动保活脚本..." > \$LOG_FILE
+echo "检查间隔: \${CHECK_INTERVAL_SECONDS} 秒" >> \$LOG_FILE
+
+while true; do
+  TIMESTAMP=\$(date "+%Y-%m-%d %H:%M:%S")
+  echo "\$TIMESTAMP: 执行保活操作..." >> \$LOG_FILE
+  
+  # 模拟活动操作
+  echo "\$TIMESTAMP: 执行系统操作..." >> \$LOG_FILE
+  
+  # 执行一些基本命令来保持活动
+  ls -la / > /dev/null
+  ps aux > /dev/null
+  free -m > /dev/null
+  
+  # 如果有特定进程需要检查，可以添加以下代码
+  # PROCESS_NAME="your_process"
+  # if ! pgrep -x "\$PROCESS_NAME" > /dev/null; then
+  #   echo "\$TIMESTAMP: 进程 \$PROCESS_NAME 未运行，尝试启动..." >> \$LOG_FILE
+  #   # 启动进程的命令
+  # else
+  #   echo "\$TIMESTAMP: 进程 \$PROCESS_NAME 正在运行" >> \$LOG_FILE
+  # fi
+  
+  echo "\$TIMESTAMP: 保活操作完成，休眠 \${CHECK_INTERVAL_SECONDS} 秒..." >> \$LOG_FILE
+  sleep \$CHECK_INTERVAL_SECONDS
+done
+EOF
+
+  # 设置执行权限
+  chmod +x /root/keepalive.sh
+  
+  # 在后台运行保活脚本
+  nohup sh /root/keepalive.sh > /dev/null 2>&1 &
+  
+  echo "保活脚本已生成并在后台运行"
+  echo "日志文件位置: /root/keepalive.log"
+}
+
+# 自动执行所有安装步骤
+auto_install() {
+  echo "开始自动安装所有组件..."
+  
+  # 安装GOST代理
+  echo "正在安装GOST代理..."
+  install_gost_proxy
+  
+  # 安装节点
+  echo "正在安装节点..."
+  install_node
+  
+  # 生成并启动保活脚本
+  echo "正在生成保活脚本..."
+  generate_keepalive
+  
+  echo "所有组件安装完成!"
+}
+
+# 检查root权限
+if [[ $EUID -ne 0 ]]; then
+  echo "请以root权限运行脚本"
+  exit 1
+fi
+
+# 检查系统类型
+if [[ -f /etc/redhat-release ]]; then
+  release="Centos"
+elif cat /etc/issue | grep -q -E -i "alpine"; then
+  release="alpine"
+elif cat /etc/issue | grep -q -E -i "debian"; then
+  release="Debian"
+elif cat /etc/issue | grep -q -E -i "ubuntu"; then
+  release="Ubuntu"
+elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
+  release="Centos"
+elif cat /proc/version | grep -q -E -i "debian"; then
+  release="Debian"
+elif cat /proc/version | grep -q -E -i "ubuntu"; then
+  release="Ubuntu"
+elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
+  release="Centos"
+else 
+  echo "脚本不支持当前的系统，请选择使用Ubuntu,Debian,Centos系统。"
+  exit 1
+fi
+
+# 检查CPU架构
+case $(uname -m) in
+aarch64) cpu=arm64;;
+x86_64) cpu=amd64;;
+*) echo "目前脚本不支持$(uname -m)架构" && exit 1;;
+esac
+
+# 设置语言环境
+export LANG=en_US.UTF-8
+
+# 如果没有指定参数,则自动执行所有安装步骤
+if [ $# -eq 0 ]; then
+  auto_install
+  exit 0
+fi
+
+# 原有的gost相关函数
